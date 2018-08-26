@@ -521,7 +521,8 @@ btc.createPaymentTransactionNew(
     segwit?: boolean = false,
     initialTimestamp?: number,
     additionals?: Array<string>,
-    expiryHeight?: Buffer
+    expiryHeight?: Buffer,
+    scripts?: [string]
   ) {
     const hasTimestamp = initialTimestamp !== undefined;
     let startTime = Date.now();
@@ -612,15 +613,21 @@ btc.createPaymentTransactionNew(
       .then(() =>
         doIf(!resuming, () =>
           // Collect public keys
-          foreach(inputs, (input, i) =>
-            this.getWalletPublicKey_private(associatedKeysets[i], false, false)
+          foreach(inputs, (input, i) => {
+            if (associatedKeysets[i]) {
+              return this.getWalletPublicKey_private(associatedKeysets[i], false, false)
+            } else {
+              return Promise.resolve(null)
+            }
+          }
           ).then(result => {
             for (let index = 0; index < result.length; index++) {
-              publicKeys.push(
-                this.compressPublicKey(
-                  Buffer.from(result[index].publicKey, "hex")
-                )
-              );
+              const compressedPK = result[index] ?
+                    this.compressPublicKey(
+                      Buffer.from(result[index].publicKey, "hex")
+                    ) :
+                    null
+              publicKeys.push(compressedPK);
             }
           })
         )
@@ -659,16 +666,21 @@ btc.createPaymentTransactionNew(
       .then(() =>
         // Do the second run with the individual transaction
         foreach(inputs, (input, i) => {
-          let script =
-            inputs[i].length >= 3 && typeof inputs[i][2] === "string"
-              ? Buffer.from(inputs[i][2], "hex")
-              : !segwit
-                ? regularOutputs[i].script
-                : Buffer.concat([
-                    Buffer.from([OP_PUSHDATA1, OP_HASH160, HASH_SIZE]),
-                    this.hashPublicKey(publicKeys[i]),
-                    Buffer.from([OP_EQUALVERIFY, OP_CHECKSIG])
-                  ]);
+          if (!publicKeys[i]) {
+            signatures.push(null);
+            targetTransaction.inputs[i].script = nullScript;
+            return Promise.resolve()
+          }
+          const script =
+              inputs[i].length >= 3 && typeof inputs[i][2] === "string"
+                ? Buffer.from(inputs[i][2], "hex")
+                : !segwit
+                  ? regularOutputs[i].script
+                  : Buffer.concat([
+                      Buffer.from([OP_PUSHDATA1, OP_HASH160, HASH_SIZE]),
+                      this.hashPublicKey(publicKeys[i]),
+                      Buffer.from([OP_EQUALVERIFY, OP_CHECKSIG])
+                    ]);
           let pseudoTX = Object.assign({}, targetTransaction);
           let pseudoTrustedInputs = useBip143
             ? [trustedInputs[i]]
@@ -720,16 +732,20 @@ btc.createPaymentTransactionNew(
               this.hashPublicKey(publicKeys[i])
             ]);
           } else {
-            const signatureSize = Buffer.alloc(1);
-            const keySize = Buffer.alloc(1);
-            signatureSize[0] = signatures[i].length;
-            keySize[0] = publicKeys[i].length;
-            targetTransaction.inputs[i].script = Buffer.concat([
-              signatureSize,
-              signatures[i],
-              keySize,
-              publicKeys[i]
-            ]);
+            if (signatures[i]) {
+              const signatureSize = Buffer.alloc(1);
+              const keySize = Buffer.alloc(1);
+              signatureSize[0] = signatures[i].length;
+              keySize[0] = publicKeys[i].length;
+              targetTransaction.inputs[i].script = Buffer.concat([
+                signatureSize,
+                signatures[i],
+                keySize,
+                publicKeys[i]
+              ]);
+            } else {
+              targetTransaction.inputs[i].script = Buffer.from(scripts[i], 'hex')
+            }
           }
           let offset = useBip143 ? 0 : 4;
           targetTransaction.inputs[i].prevout = trustedInputs[i].value.slice(
