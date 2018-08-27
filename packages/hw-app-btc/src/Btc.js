@@ -706,7 +706,7 @@ btc.createPaymentTransactionNew(
               )
             )
             .then(() =>
-              this.signTransaction(
+                  this.signTransaction(
                 associatedKeysets[i],
                 lockTime,
                 sigHashType,
@@ -805,7 +805,7 @@ btc.createPaymentTransactionNew(
    * @param outputScriptHex is the hexadecimal serialized outputs of the transaction to sign
    * @param lockTime is the optional lockTime of the transaction to sign, or default (0)
    * @param sigHashType is the hash type of the transaction to sign, or default (all)
-   * @return the signed transaction ready to be broadcast
+   * @return the signatures
    * @example
 btc.signP2SHTransaction(
  [ [tx, 1, "52210289b4a3ad52a919abd2bdd6920d8a6879b1e788c38aa76f0440a6f32a9f1996d02103a3393b1439d1693b063482c04bd40142db97bdf139eedd1b51ffb7070a37eac321030b9a409a1e476b0d5d17b804fcdb81cf30f9b99c6f3ae1178206e08bc500639853ae"] ],
@@ -905,6 +905,10 @@ btc.signP2SHTransaction(
               : regularOutputs[i].script;
           let pseudoTX = Object.assign({}, targetTransaction);
           let pseudoTrustedInputs = segwit ? [trustedInputs[i]] : trustedInputs;
+          if (! associatedKeysets[i]) {
+            targetTransaction.inputs[i].script = nullScript
+            return Promise.resolve()
+          }
           if (segwit) {
             pseudoTX.inputs = [{ ...pseudoTX.inputs[i], script }];
           } else {
