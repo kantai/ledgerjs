@@ -1,7 +1,7 @@
 {
   "name": "ablankstein-ledger-hw-app-btc",
   "version": "4.21.0",
-  "description": "Ledger Hardware Wallet Bitcoin Application API",
+  "description": "Fork of the Ledger Bitcoin API with increased signing support",
   "keywords": [
     "Ledger",
     "LedgerWallet",
@@ -18,7 +18,6 @@
   "bugs": {
     "url": "https://github.com/kantai/ledgerjs/issues"
   },
-  "homepage": "https://github.com/LedgerHQ/ledgerjs",
   "publishConfig": {
     "access": "public"
   },
