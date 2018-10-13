@@ -208,6 +208,29 @@ export default class Btc {
       .then(processOutputs);
   }
 
+  async getTrustedInputBIP143NonBIP143TX(indexLookup: number, transaction: Transaction) {
+    if (!transaction) {
+      throw new Error("getTrustedInputBIP143: missing tx");
+    }
+    let sha = createHash("sha256");
+    sha.update(this.serializeTransaction(transaction, true));
+    let hash = sha.digest();
+    sha = createHash("sha256");
+    sha.update(hash);
+    hash = sha.digest();
+    const data = Buffer.alloc(4);
+    data.writeUInt32LE(indexLookup, 0);
+    const { outputs, locktime } = transaction;
+    if (!outputs || !locktime) {
+      throw new Error("getTrustedInputBIP143: locktime & outputs is expected");
+    }
+    if (!outputs[indexLookup]) {
+      throw new Error("getTrustedInputBIP143: wrong index");
+    }
+    hash = Buffer.concat([hash, data]);
+    return await hash.toString("hex");
+  }
+
   async getTrustedInputBIP143(indexLookup: number, transaction: Transaction) {
     if (!transaction) {
       throw new Error("getTrustedInputBIP143: missing tx");
@@ -552,14 +575,21 @@ btc.createPaymentTransactionNew(
       version: defaultVersion,
       timestamp: Buffer.alloc(0)
     };
-    const getTrustedInputCall = useBip143
-      ? this.getTrustedInputBIP143.bind(this)
-      : this.getTrustedInput.bind(this);
     const outputScript = Buffer.from(outputScriptHex, "hex");
 
     return foreach(inputs, input => {
-      return doIf(!resuming, () =>
-        getTrustedInputCall(input[1], input[0]).then(trustedInput => {
+      return doIf(!resuming, () => {
+        const inputUsesSegwit = input[0].witness
+        let getTrustedInputCall
+        if (inputUsesSegwit && !useBip143) {
+          getTrustedInputCall = this.getTrustedInputBIP143NonBIP143TX.bind(this)
+        } else if (segwit) {
+          getTrustedInputCall = this.getTrustedInputBIP143.bind(this)
+        } else {
+          getTrustedInputCall = this.getTrustedInput.bind(this);
+        }
+
+        return getTrustedInputCall(input[1], input[0]).then(trustedInput => {
           let sequence = Buffer.alloc(4);
           sequence.writeUInt32LE(
             input.length >= 4 && typeof input[3] === "number"
@@ -573,7 +603,7 @@ btc.createPaymentTransactionNew(
             sequence
           });
         })
-      )
+      })
         .then(() => {
           const { outputs } = input[0];
           const index = input[1];
@@ -838,14 +868,21 @@ btc.signP2SHTransaction(
       version: defaultVersion
     };
 
-    const getTrustedInputCall = segwit
-      ? this.getTrustedInputBIP143.bind(this)
-      : this.getTrustedInput.bind(this);
     const outputScript = Buffer.from(outputScriptHex, "hex");
 
     return foreach(inputs, input =>
-      doIf(!resuming, () =>
-        getTrustedInputCall(input[1], input[0]).then(trustedInput => {
+      doIf(!resuming, () => {
+        const inputUsesSegwit = input[0].witness
+        let getTrustedInputCall
+        if (inputUsesSegwit && !segwit) {
+          getTrustedInputCall = this.getTrustedInputBIP143NonBIP143TX.bind(this)
+        } else if (segwit) {
+          getTrustedInputCall = this.getTrustedInputBIP143.bind(this)
+        } else {
+          getTrustedInputCall = this.getTrustedInput.bind(this);
+        }
+
+        return getTrustedInputCall(input[1], input[0]).then(trustedInput => {
           let sequence = Buffer.alloc(4);
           sequence.writeUInt32LE(
             input.length >= 4 && typeof input[3] === "number"
@@ -855,13 +892,14 @@ btc.signP2SHTransaction(
           );
           trustedInputs.push({
             trustedInput: false,
-            value: segwit
+            isBip143: inputUsesSegwit,
+            value: inputUsesSegwit
               ? Buffer.from(trustedInput, "hex")
               : Buffer.from(trustedInput, "hex").slice(4, 4 + 0x24),
             sequence
           });
         })
-      ).then(() => {
+      }).then(() => {
         const { outputs } = input[0];
         const index = input[1];
         if (outputs && index <= outputs.length - 1) {
@@ -914,6 +952,7 @@ btc.signP2SHTransaction(
           } else {
             pseudoTX.inputs[i].script = script;
           }
+
           return this.startUntrustedHashTransactionInput(
             !segwit && firstRun,
             pseudoTX,
