@@ -1,6 +1,6 @@
 {
   "name": "ablankstein-ledger-hw-app-btc",
-  "version": "4.21.0",
+  "version": "4.22.0",
   "description": "Fork of the Ledger Bitcoin API with increased signing support",
   "keywords": [
     "Ledger",
