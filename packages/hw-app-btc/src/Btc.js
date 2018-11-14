@@ -621,7 +621,7 @@ btc.createPaymentTransactionNew(
     initialTimestamp?: number,
     additionals?: Array<string> = [],
     expiryHeight?: Buffer,
-    scripts?: [string]
+    scripts?: [string],
   ) {
     const isDecred = additionals.includes("decred");
     const hasTimestamp = initialTimestamp !== undefined;
@@ -677,8 +677,11 @@ btc.createPaymentTransactionNew(
               0
             );
             trustedInputs.push({
-              trustedInput: true,
-              value: Buffer.from(trustedInput, "hex"),
+              trustedInput: false,
+              isBip143: inputUsesSegwit,
+              value: inputUsesSegwit
+                ? Buffer.from(trustedInput, "hex")
+                : Buffer.from(trustedInput, "hex").slice(4, 4 + 0x24),
               sequence
             });
           }
@@ -877,7 +880,7 @@ btc.createPaymentTransactionNew(
               targetTransaction.inputs[i].script = Buffer.from(scripts[i], 'hex')
             }
           }
-          let offset = useBip143 ? 0 : 4;
+          let offset = trustedInputs[i].isBip143 ? 0 : 4;
           targetTransaction.inputs[i].prevout = trustedInputs[i].value.slice(
             offset,
             offset + 0x24

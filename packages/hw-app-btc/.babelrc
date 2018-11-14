@@ -1,0 +1,16 @@
+{
+  "presets": [
+    [
+      "@babel/env",
+      {
+        "targets": {
+          "browsers": ["last 2 versions"],
+          "node": 8
+        },
+        "forceAllTransforms": true
+      }
+    ],
+    "@babel/flow"
+  ],
+  "plugins": ["@babel/plugin-transform-runtime"]
+}
