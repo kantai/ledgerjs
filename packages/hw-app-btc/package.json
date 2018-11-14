@@ -1,6 +1,6 @@
 {
   "name": "ablankstein-ledger-hw-app-btc",
-  "version": "4.22.0",
+  "version": "4.30.0",
   "description": "Fork of the Ledger Bitcoin API with increased signing support",
   "keywords": [
     "Ledger",
@@ -24,7 +24,7 @@
   "main": "lib/Btc.js",
   "license": "Apache-2.0",
   "dependencies": {
-    "@ledgerhq/hw-transport": "^4.21.0",
+    "@ledgerhq/hw-transport": "^4.24.0",
     "create-hash": "^1.1.3"
   },
   "devDependencies": {
