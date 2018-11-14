@@ -657,7 +657,7 @@ btc.createPaymentTransactionNew(
 
     return foreach(inputs, input => {
       return doIf(!resuming, () => {
-        const inputUsesSegwit = input[0].witness
+        const inputUsesSegwit = !!input[0].witness
         let getTrustedInputCall
         if (inputUsesSegwit && !useBip143) {
           getTrustedInputCall = this.getTrustedInputBIP143NonBIP143TX.bind(this)
@@ -880,7 +880,7 @@ btc.createPaymentTransactionNew(
               targetTransaction.inputs[i].script = Buffer.from(scripts[i], 'hex')
             }
           }
-          let offset = trustedInputs[i].isBip143 ? 0 : 4;
+          let offset = 0
           targetTransaction.inputs[i].prevout = trustedInputs[i].value.slice(
             offset,
             offset + 0x24
